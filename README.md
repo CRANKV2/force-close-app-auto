@@ -1,8 +1,6 @@
 ## Force Close Apps Automatically
 
 
-This code will force close apps which are get removed or swiped away inside ur recent drawer
+This script will `allow` apps with the package names listed in the `allowed_apps.conf` to `run in the background`, while `all other apps will be force stopped`. If the current app is not in the list, all other apps will be force stopped every second.
 
-
-
-This script can be run using the sh command on the Android terminal. Note that the broadcast receiver will continue to listen for the `android.intent.action.CLOSE_SYSTEM_DIALOGS` intent even after the script is finished executing, so it will automatically force close the app whenever it is removed from the recent app drawer.
+Keep in mind that you will need to have `root access`
