@@ -1,42 +1,33 @@
 #!/system/bin/sh
 
-# Register broadcast receiver
-am broadcast -a "android.intent.action.CLOSE_SYSTEM_DIALOGS" -n "com.example.forceclosereceiver/.ForceCloseReceiver"
+# Include the configuration file
+source allowed_apps.conf
 
-# Define broadcast receiver class
-cat > /data/local/tmp/ForceCloseReceiver.java << EOF
-package com.example.forceclosereceiver;
+# Create an array from the configuration file
+declare -a allowed_apps
+for line in $(cat allowed_apps.conf); do
+  allowed_apps+=($line)
+done
 
-import android.app.ActivityManager;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.util.Log;
 
-public class ForceCloseReceiver extends BroadcastReceiver {
-    private static final String TAG = "ForceCloseReceiver";
+while true; do
+  # Get the package name of the foreground app
+  package_name=$(su -c dumpsys activity activities | grep "mFocusedActivity" | cut -d " " -f 5 | cut -d "/" -f 1)
 
-    @Override
-    public void onReceive(Context context, Intent intent) {
-        if (intent.getAction().equals("android.intent.action.CLOSE_SYSTEM_DIALOGS")) {
-            // Get current foreground activity
-            ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
-            String packageName = am.getRunningTasks(1).get(0).topActivity.getPackageName();
-            // Force close activity
-            am force-stop "$packageName"
-            Log.i(TAG, "Force closed app: " + packageName);
-        }
-    }
-}
-EOF
+  # Check if the current app is allowed to run in the background
+  allowed=false
+  for app in "${allowed_apps[@]}"; do
+    if [ "$app" = "$package_name" ]; then
+      allowed=true
+      break
+    fi
+  done
 
-# Compile broadcast receiver class
-javac /data/local/tmp/ForceCloseReceiver.java
+  # If the current app is not allowed to run in the background, force stop all other apps
+  if ! $allowed; then
+    su -c "am force-stop --user 0 '*'"
+  fi
 
-# Install broadcast receiver class
-dex2oat --dex-file=/data/local/tmp/ForceCloseReceiver.dex --oat-file=/data/local/tmp/ForceCloseReceiver.oat
-
-# Set permissions on broadcast receiver class
-chmod 755 /data/local/tmp/ForceCloseReceiver.oat
-
-###
+  # Sleep for 1 second before checking again
+  sleep 1
+done
